@@ -1,0 +1,15 @@
+# Build a runtime artefakty
+build/
+dist/
+.venv/
+__pycache__/
+*.pyc
+*.spec
+.pytest_cache/
+
+# Jednorazove GUI smoke skripty (viz CLAUDE.md)
+smoke_*
+
+# Lokalni dev kontext — nepatri do verejneho repa
+CLAUDE.md
+ROADMAP.md
