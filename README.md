@@ -36,7 +36,7 @@ pro zápis do Jiry.
 
 Pravý klik na ikonu v liště otevře menu: *Zadat aktivitu*, *Dnešní sumář*,
 *Týdenní přehled*, *Upravit záznamy…*, *Odeslat do Jiry…*, *Nastavení…*,
-*Konec*.
+*Restartovat*, *Konec*.
 
 ### Příkazy v okně
 
@@ -53,6 +53,7 @@ Pravý klik na ikonu v liště otevře menu: *Zadat aktivitu*, *Dnešní sumář
 | `uprav [datum]` / `edit`| otevře editor záznamů (`uprav vcera`, `uprav 2026-06-09`; bez data dnešek) |
 | `jira [datum]`          | otevře výkazy k odeslání do Jiry (`jira vcera`, `jira 2026-06-09`; bez data dnešek) |
 | `nastaveni` / `settings`| otevře okno s nastavením                          |
+| `restart` / `restartovat`| restartuje aplikaci (načte novou verzi kódu i konfigurace) |
 | `quit` / `konec`        | ukončí aplikaci                                   |
 | Esc                     | zavře okno bez akce                               |
 
@@ -67,6 +68,9 @@ powershell -ExecutionPolicy Bypass -File install_autostart.ps1
 
 # ukončení běžící aplikace (např. ze skriptu; totéž co Konec v menu)
 python -m timetrack quit
+
+# restart běžící aplikace (načte novou verzi kódu; totéž co Restartovat v menu)
+python -m timetrack restart
 ```
 
 Spouštěj ze složky projektu (kvůli `-m timetrack`).

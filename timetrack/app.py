@@ -37,6 +37,7 @@ WEEK_WORDS = {"týden", "tyden", "week"}
 JIRA_WORDS = {"jira"}
 EDIT_WORDS = {"uprav", "upravit", "edit"}
 SETTINGS_WORDS = {"nastaveni", "nastavení", "settings"}
+RESTART_WORDS = {"restart", "restartovat"}
 NOTE_PREFIX = "pozn"
 TICKET_PREFIX = "ticket"
 
@@ -92,6 +93,8 @@ def parse_command(text: str) -> tuple[str, str]:
         return "edit", text.split(None, 1)[1].strip()
     if word in SETTINGS_WORDS:
         return "settings", ""
+    if word in RESTART_WORDS:
+        return "restart", ""
     if word == NOTE_PREFIX:
         return "note", ""
     if word.startswith(NOTE_PREFIX + " "):
@@ -191,6 +194,18 @@ def run_app(cfg: dict) -> None:
             return
         os.startfile(str(updater))
 
+    def restart_app() -> None:
+        # Spusť novou instanci (chvíli počká na uvolnění zkratky) a ukonči tuhle.
+        from timetrack import __main__ as tt_main
+
+        try:
+            tt_main.spawn_instance()
+        except Exception as error:  # noqa: BLE001 — když se nepodaří, zůstaň běžet
+            show_message("warn", f"Restart se nezdařil.\n{type(error).__name__}: {error}")
+            return
+        tray.stop()
+        root.destroy()
+
     def execute(action: str, payload: str = "") -> None:
         if action == "quit":
             tray.stop()
@@ -216,6 +231,8 @@ def run_app(cfg: dict) -> None:
             open_edit_dialog(payload)
         elif action == "settings":
             open_settings_dialog()
+        elif action == "restart":
+            restart_app()
         elif action == "notify":
             show_message("info", payload)
         elif action == "warn":

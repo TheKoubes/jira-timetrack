@@ -93,6 +93,7 @@ def test_menu_ids_map_to_actions():
     assert menu_action(5) == "jira"
     assert menu_action(6) == "edit"
     assert menu_action(7) == "settings"
+    assert menu_action(8) == "restart"
 
 
 def test_unknown_or_cancelled_menu_gives_none():

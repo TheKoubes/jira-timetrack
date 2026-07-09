@@ -1,4 +1,5 @@
 import json
+import sys
 from datetime import date, datetime
 
 import pytest
@@ -151,6 +152,59 @@ def test_quit_fails_when_app_does_not_run(cfg, monkeypatch, capsys):
 
 def test_unknown_command_fails(cfg):
     assert main(["vymysleny"], cfg=cfg) != 0
+
+
+def test_relaunch_argv_uses_module_when_not_frozen(monkeypatch):
+    from timetrack import __main__ as entry
+
+    monkeypatch.delattr(sys, "frozen", raising=False)
+    argv = entry._relaunch_argv()
+    assert argv[1:] == ["-m", "timetrack"]
+    # bez frozenu spousti Python interpret (pythonw preferovan pred python.exe)
+    assert argv[0].lower().endswith(("python.exe", "pythonw.exe"))
+
+
+def test_relaunch_prefers_pythonw_over_console_python(monkeypatch, tmp_path):
+    from timetrack import __main__ as entry
+
+    monkeypatch.delattr(sys, "frozen", raising=False)
+    (tmp_path / "python.exe").write_text("")
+    (tmp_path / "pythonw.exe").write_text("")  # existuje vedle -> preferovat
+    monkeypatch.setattr(sys, "executable", str(tmp_path / "python.exe"))
+
+    assert entry._relaunch_argv()[0] == str(tmp_path / "pythonw.exe")
+
+
+def test_relaunch_argv_uses_executable_when_frozen(monkeypatch):
+    from timetrack import __main__ as entry
+
+    monkeypatch.setattr(sys, "frozen", True, raising=False)
+    assert entry._relaunch_argv() == [sys.executable]
+
+
+def test_restart_spawns_new_instance_and_quits_old(cfg, monkeypatch, capsys):
+    from timetrack import __main__ as entry
+
+    monkeypatch.setattr("timetrack.tray.request_quit", lambda: True)
+    monkeypatch.setattr("timetrack.tray.is_running", lambda: False)  # hned uvolneno
+    spawned = []
+    monkeypatch.setattr(entry, "spawn_instance", lambda: spawned.append(1))
+
+    assert main(["restart"], cfg=cfg) == 0
+    assert spawned == [1]
+    assert "restartovan" in capsys.readouterr().out
+
+
+def test_restart_starts_even_when_not_running(cfg, monkeypatch, capsys):
+    from timetrack import __main__ as entry
+
+    monkeypatch.setattr("timetrack.tray.request_quit", lambda: False)
+    spawned = []
+    monkeypatch.setattr(entry, "spawn_instance", lambda: spawned.append(1))
+
+    assert main(["restart"], cfg=cfg) == 0
+    assert spawned == [1]
+    assert "spusten" in capsys.readouterr().out
 
 
 def test_run_reports_startup_failure_instead_of_crashing(monkeypatch, tmp_path):

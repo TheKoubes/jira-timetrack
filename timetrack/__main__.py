@@ -1,5 +1,6 @@
 """Entry point and CLI: run (default) | log "text" | stop | summary [date]."""
 
+import os
 import sys
 from datetime import date, datetime
 
@@ -14,8 +15,37 @@ Pouziti:
   python -m timetrack summary [datum]  vytvori denni sumar (datum = YYYY-MM-DD, vychozi dnes)
   python -m timetrack week [datum]     vytvori tydenni prehled (tyden obsahujici datum)
   python -m timetrack jira [datum]     odesle worklogy dne do Jiry (interaktivni vyber)
+  python -m timetrack restart          restartuje bezici aplikaci (nacte novou verzi kodu)
   python -m timetrack quit             ukonci bezici aplikaci na pozadi
 """
+
+
+def _relaunch_argv() -> list[str]:
+    """Prikaz pro spusteni nove instance GUI (dev pythonw i frozen .exe)."""
+    if getattr(sys, "frozen", False):
+        return [sys.executable]  # TimeTrack.exe -> run_timetrack -> GUI
+    exe = sys.executable
+    # CLI `restart` bezi pod konzolovym python.exe -> pro novou instanci radeji
+    # pythonw.exe (bez okna); GUI uz bezi pod pythonw/TimeTrack.exe -> nechat.
+    if os.path.basename(exe).lower() == "python.exe":
+        windowless = os.path.join(os.path.dirname(exe), "pythonw.exe")
+        if os.path.exists(windowless):
+            exe = windowless
+    return [exe, "-m", "timetrack"]
+
+
+def spawn_instance() -> None:
+    """Spusti novou, odpojenou instanci aplikace (prezije ukonceni te soucasne)."""
+    import subprocess
+    from pathlib import Path
+
+    if getattr(sys, "frozen", False):
+        cwd = Path(sys.executable).resolve().parent
+    else:
+        cwd = Path(__file__).resolve().parent.parent  # obsahuje balik timetrack/
+    # DETACHED_PROCESS | CREATE_NEW_PROCESS_GROUP — nezavisla na rodici.
+    flags = 0x00000008 | 0x00000200
+    subprocess.Popen(_relaunch_argv(), cwd=str(cwd), creationflags=flags, close_fds=True)
 
 
 def main(argv: list[str] | None = None, cfg: dict | None = None) -> int:
@@ -71,6 +101,21 @@ def main(argv: list[str] | None = None, cfg: dict | None = None) -> int:
     if command == "jira":
         day = date.fromisoformat(argv[1]) if len(argv) > 1 else date.today()
         return jira.run_send_command(cfg, day)
+
+    if command == "restart":
+        import time
+
+        from timetrack import tray  # lazy: Win32 vrstva jen kdyz je potreba
+
+        running = tray.request_quit()
+        if running:
+            for _ in range(30):  # ~6 s: pockej, az stara instance uvolni zkratku
+                if not tray.is_running():
+                    break
+                time.sleep(0.2)
+        spawn_instance()
+        print("TimeTrack restartovan." if running else "TimeTrack nebezel — spusten.")
+        return 0
 
     if command == "quit":
         from timetrack import tray  # lazy: Win32 vrstva jen kdyz je potreba

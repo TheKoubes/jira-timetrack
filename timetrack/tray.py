@@ -8,6 +8,7 @@ tray callbacks; everything is forwarded as action strings through
 import ctypes
 import sys
 import threading
+import time
 from collections.abc import Callable
 from ctypes import wintypes
 from dataclasses import dataclass
@@ -68,6 +69,7 @@ MENU_ITEMS = [
     (6, "edit", "Upravit záznamy…"),
     (5, "jira", "Odeslat do Jiry…"),
     (7, "settings", "Nastavení…"),
+    (8, "restart", "Restartovat"),
     None,
     (4, "quit", "Konec"),
 ]
@@ -95,6 +97,11 @@ def request_quit() -> bool:
         return False
     user32.PostMessageW(hwnd, WM_CLOSE, 0, 0)
     return True
+
+
+def is_running() -> bool:
+    """True když už běží instance TimeTracku (má registrované tray okno)."""
+    return bool(user32.FindWindowW(WINDOW_CLASS, None))
 
 LRESULT = ctypes.c_ssize_t
 WNDPROC = ctypes.WINFUNCTYPE(LRESULT, wintypes.HWND, wintypes.UINT, wintypes.WPARAM, wintypes.LPARAM)
@@ -251,7 +258,15 @@ class TrayThread:
         self.hwnd = user32.CreateWindowExW(
             0, WINDOW_CLASS, "TimeTrack", 0, 0, 0, 0, 0, None, None, hinstance, None
         )
-        if not user32.RegisterHotKey(self.hwnd, 1, self.modifiers | MOD_NOREPEAT, self.vk):
+        # Krátce to zkoušej dokola — při restartu stará instance ještě chvíli
+        # drží zkratku, než se ukončí; ~3 s stačí na její uvolnění.
+        registered = False
+        for _ in range(20):
+            if user32.RegisterHotKey(self.hwnd, 1, self.modifiers | MOD_NOREPEAT, self.vk):
+                registered = True
+                break
+            time.sleep(0.15)
+        if not registered:
             self.on_error(
                 f"Zkratku {self.hotkey_spec!r} se nepodařilo zaregistrovat.\n"
                 "Nejspíš ji už používá jiná aplikace (nebo běží druhý TimeTrack)."

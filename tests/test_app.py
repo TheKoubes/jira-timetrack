@@ -118,6 +118,12 @@ def test_settings_words():
     assert parse_command("settings") == ("settings", "")
 
 
+def test_restart_words():
+    assert parse_command("restart") == ("restart", "")
+    assert parse_command("restartovat") == ("restart", "")
+    assert parse_command("Restart") == ("restart", "")
+
+
 def test_pozn_prefix_adds_note():
     assert parse_command("pozn cekam na build") == ("note", "cekam na build")
 
