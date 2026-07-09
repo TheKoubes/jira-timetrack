@@ -28,9 +28,11 @@ class FakeOpener:
         self.payload = payload if payload is not None else {"tag_name": "v1.4", "html_url": "u"}
         self.error = error
         self.calls = 0
+        self.requests = []
 
     def open(self, request, timeout=None):
         self.calls += 1
+        self.requests.append(request)
         if self.error:
             raise self.error
         return FakeResponse(self.payload)
@@ -60,6 +62,53 @@ def cfg(**over):
     base = {"update_check": True, "update_repo": "x/y"}
     base.update(over)
     return base
+
+
+class TestChannel:
+    def test_stable_hits_releases_latest(self):
+        opener = FakeOpener(payload={"tag_name": "v1.4", "html_url": "u"})
+
+        tag, url = updatecheck.fetch_latest("x/y", opener=opener, prerelease=False)
+
+        assert (tag, url) == ("v1.4", "u")
+        assert opener.requests[0].full_url.endswith("/releases/latest")
+
+    def test_beta_hits_releases_list_and_skips_drafts(self):
+        opener = FakeOpener(payload=[
+            {"tag_name": "v1.6", "html_url": "draft", "draft": True, "prerelease": True},
+            {"tag_name": "v1.5-beta", "html_url": "b", "draft": False, "prerelease": True},
+            {"tag_name": "v1.4", "html_url": "u", "draft": False, "prerelease": False},
+        ])
+
+        tag, url = updatecheck.fetch_latest("x/y", opener=opener, prerelease=True)
+
+        assert (tag, url) == ("v1.5-beta", "b")  # prvni nekoncept
+        assert "/releases?" in opener.requests[0].full_url
+
+    def test_beta_empty_list_gives_blank(self):
+        opener = FakeOpener(payload=[])
+
+        assert updatecheck.fetch_latest("x/y", opener=opener, prerelease=True) == ("", "")
+
+    def test_check_beta_channel_offers_prerelease(self, tmp_path):
+        opener = FakeOpener(payload=[
+            {"tag_name": "v1.5-beta", "html_url": "https://rel/beta", "draft": False,
+             "prerelease": True},
+        ])
+
+        result = updatecheck.check(
+            cfg(update_prerelease=True), "1.4", now=NOW, opener=opener, path=tmp_path / "s.json"
+        )
+
+        assert result == updatecheck.UpdateInfo("1.5-beta", "https://rel/beta")
+        assert "/releases?" in opener.requests[0].full_url
+
+    def test_check_stable_channel_ignores_prerelease_endpoint(self, tmp_path):
+        opener = FakeOpener(payload={"tag_name": "v1.4", "html_url": "u"})
+
+        updatecheck.check(cfg(), "1.4", now=NOW, opener=opener, path=tmp_path / "s.json")
+
+        assert opener.requests[0].full_url.endswith("/releases/latest")
 
 
 class TestCheck:

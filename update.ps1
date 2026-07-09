@@ -15,14 +15,19 @@
 # tohoto skriptu) nekolimuje s bezicim updatem. Vyzaduje Python (jako ZIP
 # instalace) — pro .exe distribuci stahni novou verzi rucne z Releases.
 #
+# Repo i kanal (stabilni/beta) se ctou z ~/.timetrack/config.json (update_repo,
+# update_prerelease), aby sedely s aplikaci; parametry maji prednost.
+#
 # Parametry:
-#   -Repo <owner/name>  GitHub repo (vychozi TheKoubes/jira-timetrack)
+#   -Repo <owner/name>  GitHub repo (jinak z configu, jinak TheKoubes/jira-timetrack)
+#   -Prerelease         beta kanal: bere i pre-release verze (jinak z configu)
 #   -Force              nainstaluje i kdyz neni novejsi (reinstalace)
 #   -CheckOnly          jen zjisti a vypise dostupnou verzi, nic nestahuje
 
 [CmdletBinding()]
 param(
-    [string]$Repo = 'TheKoubes/jira-timetrack',
+    [string]$Repo = '',
+    [switch]$Prerelease,
     [switch]$Force,
     [switch]$CheckOnly
 )
@@ -47,12 +52,34 @@ function Get-LocalVersion {
 
 $headers = @{ 'User-Agent' = 'TimeTrack-updater'; 'Accept' = 'application/vnd.github+json' }
 
+# Repo + kanal z configu (parametry maji prednost).
+$cfgRepo = ''
+$cfgPre = $false
+$cfgPath = Join-Path $env:USERPROFILE '.timetrack\config.json'
+if (Test-Path $cfgPath) {
+    try {
+        $c = Get-Content $cfgPath -Raw | ConvertFrom-Json
+        if ($c.update_repo) { $cfgRepo = "$($c.update_repo)" }
+        if ($null -ne $c.update_prerelease) { $cfgPre = [bool]$c.update_prerelease }
+    } catch { }
+}
+if (-not $Repo) { $Repo = if ($cfgRepo) { $cfgRepo } else { 'TheKoubes/jira-timetrack' } }
+$usePre = $Prerelease.IsPresent -or $cfgPre
+
 Write-Host "TimeTrack - aktualizace" -ForegroundColor White
 
 # --- 1) Nejnovejsi release -------------------------------------------------
 Write-Step "Kontrola nejnovejsi verze"
+Write-Host "  Kanal: $(if ($usePre) { 'beta (vcetne pre-release)' } else { 'stabilni' })"
 try {
-    $release = Invoke-RestMethod -Uri "https://api.github.com/repos/$Repo/releases/latest" -Headers $headers
+    if ($usePre) {
+        # /releases/latest pre-release ignoruje -> seznam a prvni nekoncept.
+        $list = Invoke-RestMethod -Uri "https://api.github.com/repos/$Repo/releases?per_page=10" -Headers $headers
+        $release = @($list | Where-Object { -not $_.draft })[0]
+        if (-not $release) { Write-Warn2 "Repo $Repo zatim nema zadny release - neni co aktualizovat."; return }
+    } else {
+        $release = Invoke-RestMethod -Uri "https://api.github.com/repos/$Repo/releases/latest" -Headers $headers
+    }
 } catch {
     $status = $null
     if ($_.Exception.Response) { $status = [int]$_.Exception.Response.StatusCode }

@@ -16,6 +16,7 @@ FONT = ("Segoe UI", 10)
 GENERAL = [
     ("hotkey", "Klávesová zkratka", "text"),
     ("update_check", "Upozorňovat na nové verze", "bool"),
+    ("update_prerelease", "Nabízet i beta verze (pre-release)", "bool"),
 ]
 TIME = [
     ("rounding_minutes", "Zaokrouhlení součtů (min, 0 = vypnuto)", "int"),

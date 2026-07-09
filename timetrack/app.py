@@ -44,7 +44,7 @@ SETTINGS_KEYS = [
     "hotkey", "rounding_minutes", "rounding_mode", "round_times",
     "auto_stop_on_lock", "auto_stop_on_suspend", "auto_stop_on_logoff",
     "jira_base_url", "jira_email", "jira_account_field", "data_dir",
-    "update_check",
+    "update_check", "update_prerelease",
 ]
 
 

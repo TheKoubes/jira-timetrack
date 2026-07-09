@@ -150,7 +150,8 @@ prvním spuštění); jde upravit i ručně:
   "jira_email": "",
   "jira_account_field": "",
   "update_check": true,
-  "update_repo": "TheKoubes/jira-timetrack"
+  "update_repo": "TheKoubes/jira-timetrack",
+  "update_prerelease": false
 }
 ```
 
@@ -189,6 +190,11 @@ prvním spuštění); jde upravit i ručně:
   (jde přepnout i v Nastavení → Obecné).
 - `update_repo` — GitHub repo, ze kterého se berou aktualizace
   (`vlastník/název`); měň jen když si projekt forkneš.
+- `update_prerelease` — `false` (výchozí) sleduje jen ostré verze; `true`
+  zapne **beta kanál** a nabízí i předběžné (pre-release) verze — hodí se pro
+  testery, kteří chtějí novinky dřív. Přepínatelné i v Nastavení → Obecné.
+  (Vydavatel označí verzi jako pre-release; běžní uživatelé ji nedostanou,
+  dokud ji nepovýší na ostrou.)
 
 Po změně konfigurace aplikaci restartuj. Při aktualizaci aplikace se nové
 klíče do existujícího souboru doplní samy s výchozími hodnotami.

@@ -69,11 +69,16 @@ def _due(state: dict, now: datetime, interval: timedelta) -> bool:
         return True
 
 
-def fetch_latest(repo: str = REPO, opener=None) -> tuple[str, str]:
-    """Vrať (tag, url) nejnovějšího release. GitHub vyžaduje User-Agent."""
-    url = f"https://api.github.com/repos/{repo}/releases/latest"
+def fetch_latest(repo: str = REPO, opener=None, prerelease: bool = False) -> tuple[str, str]:
+    """Vrať (tag, url) nejnovějšího release. GitHub vyžaduje User-Agent.
+
+    ``prerelease=True`` (beta kanál) bere i pre-release verze — proto sahá na
+    ``/releases`` (seznam), protože ``/releases/latest`` pre-release ignoruje;
+    vezme první nekoncept (nejnovější publikovaný). Bez toho jen ``/latest``.
+    """
+    path = "/releases?per_page=10" if prerelease else "/releases/latest"
     request = urllib.request.Request(
-        url,
+        f"https://api.github.com/repos/{repo}{path}",
         headers={
             "User-Agent": "TimeTrack-updatecheck",
             "Accept": "application/vnd.github+json",
@@ -82,6 +87,11 @@ def fetch_latest(repo: str = REPO, opener=None) -> tuple[str, str]:
     opener = opener or urllib.request.build_opener()
     with opener.open(request, timeout=API_TIMEOUT) as response:
         payload = json.loads(response.read().decode("utf-8"))
+    if prerelease:
+        for rel in payload if isinstance(payload, list) else []:
+            if not rel.get("draft"):
+                return str(rel.get("tag_name", "")), str(rel.get("html_url", ""))
+        return "", ""
     return str(payload.get("tag_name", "")), str(payload.get("html_url", ""))
 
 
@@ -101,7 +111,11 @@ def check(cfg: dict, current: str, *, now: datetime | None = None, opener=None,
     if not _due(state, now, CHECK_INTERVAL):
         return None
     try:
-        tag, html_url = fetch_latest(cfg.get("update_repo") or REPO, opener=opener)
+        tag, html_url = fetch_latest(
+            cfg.get("update_repo") or REPO,
+            opener=opener,
+            prerelease=bool(cfg.get("update_prerelease")),
+        )
     except (urllib.error.URLError, OSError, ValueError):
         return None  # offline / API chyba → potichu, stav se nemění (zkusí se zas)
     state["last_check"] = now.isoformat()
