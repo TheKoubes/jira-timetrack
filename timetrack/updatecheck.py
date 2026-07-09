@@ -30,6 +30,18 @@ def state_path() -> Path:
     return Path.home() / ".timetrack" / "update_state.json"
 
 
+def reset_throttle(path: Path | None = None) -> None:
+    """Zahoď čas poslední kontroly, aby další proběhla hned.
+
+    Volá se po změně update nastavení (kanál/zapnutí) — jinak by změna kvůli
+    throttlingu (``CHECK_INTERVAL``) neměla efekt až ~den.
+    """
+    try:
+        (path or state_path()).unlink()
+    except OSError:
+        pass  # neexistuje / nejde smazat → další kontrola stejně proběhne
+
+
 def parse_version(text: str) -> tuple[int, ...]:
     """"v1.3" → (1, 3); nečíselné části se berou jako 0, ať porovnání nespadne."""
     parts = []

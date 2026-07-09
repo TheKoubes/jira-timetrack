@@ -111,6 +111,29 @@ class TestChannel:
         assert opener.requests[0].full_url.endswith("/releases/latest")
 
 
+class TestResetThrottle:
+    def test_reset_deletes_state_so_next_check_runs(self, tmp_path):
+        state = tmp_path / "s.json"
+        recent = (NOW - timedelta(hours=1)).isoformat()
+        state.write_text(json.dumps({"last_check": recent}), encoding="utf-8")
+
+        # Bez resetu je kontrola throttlovana (nedavno kontrolovano).
+        opener = FakeOpener(payload={"tag_name": "v1.6", "html_url": "u"})
+        assert updatecheck.check(cfg(), "1.5", now=NOW, opener=opener, path=state) is None
+        assert opener.calls == 0
+
+        updatecheck.reset_throttle(state)
+        assert not state.exists()
+
+        # Po resetu uz kontrola probehne a najde novejsi verzi.
+        opener2 = FakeOpener(payload={"tag_name": "v1.6", "html_url": "u"})
+        result = updatecheck.check(cfg(), "1.5", now=NOW, opener=opener2, path=state)
+        assert result == updatecheck.UpdateInfo("1.6", "u")
+
+    def test_reset_missing_file_is_silent(self, tmp_path):
+        updatecheck.reset_throttle(tmp_path / "chybi.json")  # nesmi spadnout
+
+
 class TestCheck:
     def test_disabled_skips_network(self, tmp_path):
         opener = FakeOpener()

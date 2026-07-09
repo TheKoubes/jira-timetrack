@@ -280,6 +280,8 @@ def run_app(cfg: dict) -> None:
                 new_values["rounding_minutes"] = max(0, int(new_values["rounding_minutes"]))
             except (TypeError, ValueError):
                 return "Zaokrouhlení musí být celé číslo (minuty)."
+            update_keys = ("update_check", "update_prerelease")
+            update_changed = any(cfg.get(k) != new_values.get(k) for k in update_keys)
             config.update_config(new_values)
             cfg.update(new_values)
             for name, path in (("jira", jira.token_path()), ("tempo", jira.tempo_token_path())):
@@ -290,6 +292,12 @@ def run_app(cfg: dict) -> None:
             except Exception as error:  # noqa: BLE001
                 return f"Automatický start se nepodařilo nastavit: {error}"
             tray.apply_settings(cfg["hotkey"], _flags_from(cfg))
+            # Změna kanálu/zapnutí kontrol: zahoď throttle a zkontroluj hned,
+            # ať se nová volba projeví bez čekání ~den (jinak matoucí).
+            if update_changed:
+                updatecheck.reset_throttle()
+                if cfg.get("update_check", True):
+                    start_update_check()
             return None
 
         def on_test(new_values: dict, tokens: dict) -> None:
