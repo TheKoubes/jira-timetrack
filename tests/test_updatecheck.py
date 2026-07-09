@@ -114,7 +114,7 @@ class TestChannel:
 class TestResetThrottle:
     def test_reset_deletes_state_so_next_check_runs(self, tmp_path):
         state = tmp_path / "s.json"
-        recent = (NOW - timedelta(hours=1)).isoformat()
+        recent = (NOW - timedelta(minutes=10)).isoformat()
         state.write_text(json.dumps({"last_check": recent}), encoding="utf-8")
 
         # Bez resetu je kontrola throttlovana (nedavno kontrolovano).
@@ -145,7 +145,7 @@ class TestCheck:
 
     def test_throttled_within_interval_skips_network(self, tmp_path):
         state = tmp_path / "s.json"
-        recent = (NOW - timedelta(hours=1)).isoformat()
+        recent = (NOW - timedelta(minutes=10)).isoformat()
         state.write_text(json.dumps({"last_check": recent}), encoding="utf-8")
         opener = FakeOpener()
 
@@ -190,3 +190,27 @@ class TestCheck:
         result = updatecheck.check(cfg(), "1.3", now=NOW, opener=opener, path=tmp_path / "s.json")
 
         assert result is None
+
+    def test_force_bypasses_throttle(self, tmp_path):
+        # Nedávná kontrola → normálně throttlovana, ale force ji obejde (start/restart).
+        state = tmp_path / "s.json"
+        recent = (NOW - timedelta(minutes=1)).isoformat()
+        state.write_text(json.dumps({"last_check": recent}), encoding="utf-8")
+        opener = FakeOpener(payload={"tag_name": "v1.4", "html_url": "u"})
+
+        result = updatecheck.check(cfg(), "1.3", now=NOW, opener=opener, path=state, force=True)
+
+        assert result == updatecheck.UpdateInfo("1.4", "u")
+        assert opener.calls == 1
+
+    def test_hourly_interval_allows_recheck_after_an_hour(self, tmp_path):
+        # Po ~hodině (> CHECK_INTERVAL 55 min) hodinová smyčka kontrolu propustí.
+        state = tmp_path / "s.json"
+        hour_ago = (NOW - timedelta(hours=1)).isoformat()
+        state.write_text(json.dumps({"last_check": hour_ago}), encoding="utf-8")
+        opener = FakeOpener(payload={"tag_name": "v1.4", "html_url": "u"})
+
+        result = updatecheck.check(cfg(), "1.3", now=NOW, opener=opener, path=state)
+
+        assert result == updatecheck.UpdateInfo("1.4", "u")
+        assert opener.calls == 1

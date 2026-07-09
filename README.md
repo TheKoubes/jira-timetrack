@@ -187,8 +187,9 @@ prvním spuštění); jde upravit i ručně:
   Prázdné (výchozí) = pole se při odesílání najde samo podle typu z Tempo
   pluginu (`GET /rest/api/3/field`); ručně vyplněné id (např.
   `customfield_10100`) má přednost.
-- `update_check` — `true` (výchozí) jednou denně ~10 s po startu tiše
-  zkontroluje, jestli na GitHubu vyšla novější verze; když ano, ukáže bublinu
+- `update_check` — `true` (výchozí) tiše zkontroluje, jestli na GitHubu vyšla
+  novější verze — při každém startu/restartu (~10 s po startu) a pak každou
+  hodinu; když ano, ukáže bublinu
   v liště a do menu přibude „Aktualizovat na X…“ (spustí stažení a instalaci —
   viz [Aktualizace](INSTALL.md)). Offline se nic neděje. `false` = vypnuto
   (jde přepnout i v Nastavení → Obecné).

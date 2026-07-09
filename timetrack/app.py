@@ -57,7 +57,8 @@ def _flags_from(cfg: dict) -> AutoStopFlags:
     )
 
 POLL_MS = 100
-UPDATE_CHECK_DELAY_MS = 10_000  # kontrola verze ~10 s po startu (síť mimo hlavní vlákno)
+UPDATE_CHECK_DELAY_MS = 10_000  # první kontrola verze ~10 s po startu (síť mimo hlavní vlákno)
+UPDATE_CHECK_INTERVAL_MS = 60 * 60 * 1000  # poté opakovaně každou hodinu
 
 
 def updater_script() -> Path | None:
@@ -534,13 +535,17 @@ def run_app(cfg: dict) -> None:
     )
     tray.start()
 
-    def start_update_check() -> None:
+    def start_update_check(force: bool = False) -> None:
+        """Spusť jednu kontrolu verze na pozadí (bez plánování opakování).
+
+        ``force=True`` obejde throttling — kontrola při každém startu/restartu.
+        """
         if not cfg.get("update_check", True):
             return
 
         def worker() -> None:
             try:
-                info = updatecheck.check(cfg, __version__)
+                info = updatecheck.check(cfg, __version__, force=force)
             except Exception:  # noqa: BLE001 — kontrola verze nesmí shodit vlákno ani appku
                 return
             if info:
@@ -548,7 +553,14 @@ def run_app(cfg: dict) -> None:
 
         threading.Thread(target=worker, daemon=True).start()
 
-    root.after(UPDATE_CHECK_DELAY_MS, start_update_check)
+    def update_check_loop() -> None:
+        """Hodinová smyčka (řetězí sama sebe); první kontrola už proběhla po startu."""
+        start_update_check()
+        root.after(UPDATE_CHECK_INTERVAL_MS, update_check_loop)
+
+    # Kontrola při startu/restartu (vynucená, obejde throttle), pak hodinová smyčka.
+    root.after(UPDATE_CHECK_DELAY_MS, lambda: start_update_check(force=True))
+    root.after(UPDATE_CHECK_DELAY_MS + UPDATE_CHECK_INTERVAL_MS, update_check_loop)
 
     def poll() -> None:
         try:

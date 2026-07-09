@@ -15,7 +15,7 @@ from pathlib import Path
 
 REPO = "TheKoubes/jira-timetrack"
 API_TIMEOUT = 15
-CHECK_INTERVAL = timedelta(hours=20)  # ~1× denně; restart téhož dne znovu nekontroluje
+CHECK_INTERVAL = timedelta(minutes=55)  # hodinová smyčka v app.py; těsně pod 60 min kvůli driftu
 
 
 @dataclass
@@ -108,19 +108,20 @@ def fetch_latest(repo: str = REPO, opener=None, prerelease: bool = False) -> tup
 
 
 def check(cfg: dict, current: str, *, now: datetime | None = None, opener=None,
-          path: Path | None = None) -> UpdateInfo | None:
+          path: Path | None = None, force: bool = False) -> UpdateInfo | None:
     """Vrať :class:`UpdateInfo`, když je k dispozici novější verze, jinak None.
 
     Respektuje ``update_check`` (opt-out), throttluje přes stavový soubor a
     offline/chybu API spolkne (vrátí None). Stav (čas poslední kontroly) se
     zapíše jen po úspěšném dotazu, aby se offline start zkusil znovu příště.
+    ``force=True`` obejde throttling (kontrola při každém startu/restartu appky).
     """
     if not cfg.get("update_check", True):
         return None
     now = now or datetime.now().astimezone()
     path = path or state_path()
     state = _load_state(path)
-    if not _due(state, now, CHECK_INTERVAL):
+    if not force and not _due(state, now, CHECK_INTERVAL):
         return None
     try:
         tag, html_url = fetch_latest(
