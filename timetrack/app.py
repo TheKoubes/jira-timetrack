@@ -2,9 +2,11 @@
 
 import os
 import queue
+import sys
 import threading
 import tkinter as tk
 from datetime import date, datetime, timedelta
+from pathlib import Path
 from tkinter import messagebox
 
 from timetrack import (
@@ -17,6 +19,7 @@ from timetrack import (
     storage,
     summary,
     ticketcache,
+    updatecheck,
 )
 from timetrack.core import build_intervals
 from timetrack.edit_dialog import EditDialog
@@ -41,6 +44,7 @@ SETTINGS_KEYS = [
     "hotkey", "rounding_minutes", "rounding_mode", "round_times",
     "auto_stop_on_lock", "auto_stop_on_suspend", "auto_stop_on_logoff",
     "jira_base_url", "jira_email", "jira_account_field", "data_dir",
+    "update_check",
 ]
 
 
@@ -52,6 +56,19 @@ def _flags_from(cfg: dict) -> AutoStopFlags:
     )
 
 POLL_MS = 100
+UPDATE_CHECK_DELAY_MS = 10_000  # kontrola verze ~10 s po startu (síť mimo hlavní vlákno)
+
+
+def updater_script() -> Path | None:
+    """Cesta k „Aktualizovat TimeTrack.cmd“, nebo None (frozen .exe / chybí).
+
+    U .exe distribuce nejsou skripty ani Python — tam se aktualizuje ručně
+    ze stránky release (viz volající).
+    """
+    if getattr(sys, "frozen", False):
+        return None
+    cmd = Path(__file__).resolve().parent.parent / "Aktualizovat TimeTrack.cmd"
+    return cmd if cmd.exists() else None
 
 
 def parse_command(text: str) -> tuple[str, str]:
@@ -126,6 +143,8 @@ def run_app(cfg: dict) -> None:
         ),
     )
 
+    available_update: dict = {}  # {"info": UpdateInfo} po nalezení nové verze
+
     def show_message(kind: str, text: str) -> None:
         # A modal box parented to the withdrawn root can open behind other
         # windows with no taskbar entry, looking like a frozen app. A
@@ -140,6 +159,37 @@ def run_app(cfg: dict) -> None:
             show("TimeTrack", text, parent=helper)
         finally:
             helper.destroy()
+
+    def ask_yes_no(text: str) -> bool:
+        helper = tk.Toplevel(root)
+        helper.withdraw()
+        helper.attributes("-topmost", True)
+        try:
+            return messagebox.askyesno("TimeTrack", text, parent=helper)
+        finally:
+            helper.destroy()
+
+    def launch_updater(info) -> None:
+        """Spusť aktualizaci: potvrzení → „Aktualizovat TimeTrack.cmd“.
+
+        Aktualizátor běží ve vlastním procesu; sám naši instanci ukončí a po
+        instalaci znovu spustí. U .exe distribuce (bez skriptů) místo toho
+        otevře stránku release ke stažení.
+        """
+        version = info.version if info else "novější verzi"
+        updater = updater_script()
+        if updater is None:
+            if info and info.url:
+                os.startfile(info.url)
+            else:
+                show_message("info", "Novou verzi stáhni z GitHub Releases.")
+            return
+        if not ask_yes_no(
+            f"Stáhnout a nainstalovat verzi {version}?\n"
+            "Aplikace se během aktualizace na chvíli ukončí a zase spustí."
+        ):
+            return
+        os.startfile(str(updater))
 
     def execute(action: str, payload: str = "") -> None:
         if action == "quit":
@@ -170,6 +220,15 @@ def run_app(cfg: dict) -> None:
             show_message("info", payload)
         elif action == "warn":
             show_message("warn", payload)
+        elif action == "update_found":
+            available_update["info"] = payload  # UpdateInfo z workeru
+            tray.notify_update(
+                payload.version, "TimeTrack",
+                f"Je dostupná verze {payload.version}. "
+                "Nainstaluj ji přes „Aktualizovat…“ v menu lišty.",
+            )
+        elif action == "update_run":
+            launch_updater(available_update.get("info"))
         elif action == "call":
             payload()  # callable from a worker thread, run on the Tk thread
         elif action == "show":
@@ -449,6 +508,22 @@ def run_app(cfg: dict) -> None:
         get_tickets=lambda: storage.recent_tickets(cfg),
     )
     tray.start()
+
+    def start_update_check() -> None:
+        if not cfg.get("update_check", True):
+            return
+
+        def worker() -> None:
+            try:
+                info = updatecheck.check(cfg, __version__)
+            except Exception:  # noqa: BLE001 — kontrola verze nesmí shodit vlákno ani appku
+                return
+            if info:
+                events.put(("update_found", info))
+
+        threading.Thread(target=worker, daemon=True).start()
+
+    root.after(UPDATE_CHECK_DELAY_MS, start_update_check)
 
     def poll() -> None:
         try:

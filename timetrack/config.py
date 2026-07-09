@@ -26,6 +26,10 @@ def _defaults() -> dict:
         "jira_base_url": "",
         "jira_email": "",
         "jira_account_field": "",
+        # Kontrola nových verzí na GitHubu (upozornění v liště). update_repo =
+        # kde se release hledají; prázdné update_check vypne kontrolu.
+        "update_check": True,
+        "update_repo": "TheKoubes/jira-timetrack",
     }
 
 

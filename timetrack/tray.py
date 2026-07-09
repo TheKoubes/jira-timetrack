@@ -31,6 +31,7 @@ WM_WTSSESSION_CHANGE = 0x02B1  # zamceni/odemceni relace
 WM_HOTKEY = 0x0312
 WM_TRAY_CALLBACK = 0x8001  # WM_APP + 1
 WM_TRAY_RELOAD = 0x8002  # WM_APP + 2 — přenačtení nastavení na tray vlákně
+WM_TRAY_BALLOON = 0x8003  # WM_APP + 3 — zobrazení bubliny (upozornění na aktualizaci)
 
 WTS_SESSION_LOCK = 0x7
 PBT_APMSUSPEND = 0x4  # systém se uspává (sleep i hibernace posílají totéž)
@@ -50,11 +51,14 @@ class AutoStopFlags:
         return self.lock or self.suspend or self.logoff
 
 NIM_ADD, NIM_MODIFY, NIM_DELETE = 0x0, 0x1, 0x2
-NIF_MESSAGE, NIF_ICON, NIF_TIP = 0x1, 0x2, 0x4
+NIF_MESSAGE, NIF_ICON, NIF_TIP, NIF_INFO = 0x1, 0x2, 0x4, 0x10
+NIIF_INFO = 0x1  # ikonka „i“ v bublině
 MF_STRING, MF_SEPARATOR = 0x0, 0x800
 TPM_RIGHTBUTTON, TPM_NONOTIFY, TPM_RETURNCMD = 0x2, 0x80, 0x100
 IMAGE_ICON, LR_LOADFROMFILE = 1, 0x10
 IDI_APPLICATION = 32512
+
+UPDATE_CMD_ID = 100  # dynamická položka „Aktualizovat…“ (mimo rozsah MENU_ITEMS)
 
 # (menu id, action, label); None = separator
 MENU_ITEMS = [
@@ -168,6 +172,9 @@ class TrayThread:
         self.hwnd: int | None = None
         self._session_registered = False
         self._pending: tuple[str, AutoStopFlags] | None = None
+        # Dostupná aktualizace: verze pro položku menu + text bubliny k zobrazení.
+        self.update_version: str | None = None
+        self._balloon: tuple[str, str] | None = None
         # The WNDPROC wrapper must outlive the window, or ctypes frees it
         # and Windows calls into released memory.
         self._wndproc = WNDPROC(self._handle_message)
@@ -185,6 +192,18 @@ class TrayThread:
             return
         self._pending = (hotkey_spec, flags)
         user32.PostMessageW(self.hwnd, WM_TRAY_RELOAD, 0, 0)
+
+    def notify_update(self, version: str, title: str, text: str) -> None:
+        """Zobraz bublinu o nové verzi a přidej do menu „Aktualizovat…“.
+
+        Volá se z hlavního vlákna přes queue; samotné Win32 volání běží až na
+        tray vlákně (přes ``WM_TRAY_BALLOON``), aby se nemíchala vlákna.
+        """
+        if not self.hwnd:
+            return
+        self.update_version = version
+        self._balloon = (title, text)
+        user32.PostMessageW(self.hwnd, WM_TRAY_BALLOON, 0, 0)
 
     def _reload(self) -> None:
         if not self._pending:
@@ -257,6 +276,9 @@ class TrayThread:
         if msg == WM_TRAY_RELOAD:
             self._reload()
             return 0
+        if msg == WM_TRAY_BALLOON:
+            self._show_balloon()
+            return 0
         if msg == WM_TRAY_CALLBACK:
             if lparam == WM_LBUTTONUP:
                 self.on_action("show")
@@ -298,6 +320,10 @@ class TrayThread:
             if action == "show":
                 label = f"{label}\t{self.hotkey_label}"
             user32.AppendMenuW(menu, MF_STRING, cmd_id, label)
+        if self.update_version:
+            user32.AppendMenuW(menu, MF_SEPARATOR, 0, None)
+            user32.AppendMenuW(menu, MF_STRING, UPDATE_CMD_ID,
+                               f"Aktualizovat na {self.update_version}…")
         point = wintypes.POINT()
         user32.GetCursorPos(ctypes.byref(point))
         # Without making our window foreground the menu would not close on
@@ -308,6 +334,9 @@ class TrayThread:
         )
         user32.PostMessageW(hwnd, 0, 0, 0)  # WM_NULL, doporučený úklid po menu
         user32.DestroyMenu(menu)
+        if cmd_id == UPDATE_CMD_ID:
+            self.on_action("update_run")
+            return
         action = menu_action(cmd_id)
         if action:
             self.on_action(action)
@@ -331,6 +360,17 @@ class TrayThread:
         nid = self._notify_data()
         nid.uFlags = NIF_TIP
         nid.szTip = f"TimeTrack – {self.hotkey_label}"
+        shell32.Shell_NotifyIconW(NIM_MODIFY, ctypes.byref(nid))
+
+    def _show_balloon(self) -> None:
+        if not self._balloon:
+            return
+        title, text = self._balloon
+        nid = self._notify_data()
+        nid.uFlags = NIF_INFO
+        nid.szInfoTitle = title[:63]
+        nid.szInfo = text[:255]
+        nid.dwInfoFlags = NIIF_INFO
         shell32.Shell_NotifyIconW(NIM_MODIFY, ctypes.byref(nid))
 
     def _remove_icon(self) -> None:

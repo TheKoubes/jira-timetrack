@@ -13,7 +13,10 @@ from tkinter import filedialog, ttk
 FONT = ("Segoe UI", 10)
 
 # (config key, label, kind) — kind: text | int | bool | choice:<a,b>
-GENERAL = [("hotkey", "Klávesová zkratka", "text")]
+GENERAL = [
+    ("hotkey", "Klávesová zkratka", "text"),
+    ("update_check", "Upozorňovat na nové verze", "bool"),
+]
 TIME = [
     ("rounding_minutes", "Zaokrouhlení součtů (min, 0 = vypnuto)", "int"),
     ("rounding_mode", "Režim zaokrouhlení", "choice:nearest,up"),

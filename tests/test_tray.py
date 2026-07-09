@@ -1,8 +1,10 @@
 from timetrack.tray import (
     PBT_APMSUSPEND,
+    UPDATE_CMD_ID,
     WM_DESTROY,
     WM_POWERBROADCAST,
     WM_QUERYENDSESSION,
+    WM_TRAY_BALLOON,
     WM_WTSSESSION_CHANGE,
     WTS_SESSION_LOCK,
     AutoStopFlags,
@@ -96,3 +98,25 @@ def test_menu_ids_map_to_actions():
 def test_unknown_or_cancelled_menu_gives_none():
     assert menu_action(0) is None  # TrackPopupMenu vraci 0 pri zavreni bez vyberu
     assert menu_action(999) is None
+
+
+def test_update_item_is_not_a_regular_menu_action():
+    # Polozka "Aktualizovat..." ma vlastni cmd id a resi se zvlast v _show_menu.
+    assert menu_action(UPDATE_CMD_ID) is None
+
+
+def test_balloon_message_routes_to_show_balloon():
+    tray = TrayThread("ctrl+alt+t", on_action=lambda a: None, on_error=lambda m: None)
+    shown = []
+    tray._show_balloon = lambda: shown.append(1)
+
+    assert tray._handle_message(0, WM_TRAY_BALLOON, 0, 0) == 0
+    assert shown == [1]
+
+
+def test_notify_update_without_window_is_noop():
+    tray = TrayThread("ctrl+alt+t", on_action=lambda a: None, on_error=lambda m: None)
+
+    tray.notify_update("1.4", "TimeTrack", "nova verze")  # hwnd je None
+
+    assert tray.update_version is None  # bez okna se nic nenastavi ani nespadne

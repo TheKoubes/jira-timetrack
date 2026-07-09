@@ -148,7 +148,9 @@ prvním spuštění); jde upravit i ručně:
   "auto_stop_on_logoff": false,
   "jira_base_url": "https://firma.atlassian.net/browse/",
   "jira_email": "",
-  "jira_account_field": ""
+  "jira_account_field": "",
+  "update_check": true,
+  "update_repo": "TheKoubes/jira-timetrack"
 }
 ```
 
@@ -180,6 +182,13 @@ prvním spuštění); jde upravit i ručně:
   Prázdné (výchozí) = pole se při odesílání najde samo podle typu z Tempo
   pluginu (`GET /rest/api/3/field`); ručně vyplněné id (např.
   `customfield_10100`) má přednost.
+- `update_check` — `true` (výchozí) jednou denně ~10 s po startu tiše
+  zkontroluje, jestli na GitHubu vyšla novější verze; když ano, ukáže bublinu
+  v liště a do menu přibude „Aktualizovat na X…“ (spustí stažení a instalaci —
+  viz [Aktualizace](INSTALL.md)). Offline se nic neděje. `false` = vypnuto
+  (jde přepnout i v Nastavení → Obecné).
+- `update_repo` — GitHub repo, ze kterého se berou aktualizace
+  (`vlastník/název`); měň jen když si projekt forkneš.
 
 Po změně konfigurace aplikaci restartuj. Při aktualizaci aplikace se nové
 klíče do existujícího souboru doplní samy s výchozími hodnotami.
