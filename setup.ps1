@@ -150,7 +150,8 @@ if ($same) {
     Write-Ok "Instaluji primo ve zdrojove slozce."
 } else {
     New-Item -ItemType Directory -Force -Path $InstallDir | Out-Null
-    foreach ($item in @('timetrack', 'assets', 'README.md', 'install_autostart.ps1')) {
+    foreach ($item in @('timetrack', 'assets', 'README.md', 'install_autostart.ps1',
+                        'update.ps1', 'Aktualizovat TimeTrack.cmd')) {
         $src = Join-Path $source $item
         if (Test-Path $src) {
             Copy-Item $src (Join-Path $InstallDir $item) -Recurse -Force

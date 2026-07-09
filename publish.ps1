@@ -35,7 +35,8 @@ function Write-Ok($text) { Write-Host "  OK  $text" -ForegroundColor Green }
 # noveho souboru do distribuce rozsirit i tenhle seznam.
 $zipItems = @(
     'timetrack', 'assets', 'README.md', 'INSTALL.md', 'LICENSE',
-    'setup.ps1', 'install_autostart.ps1', 'Nainstalovat TimeTrack.cmd'
+    'setup.ps1', 'install_autostart.ps1', 'Nainstalovat TimeTrack.cmd',
+    'update.ps1', 'Aktualizovat TimeTrack.cmd'
 )
 
 # --- 1) Cisty strom + testy ------------------------------------------------

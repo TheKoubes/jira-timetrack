@@ -87,10 +87,14 @@ Kompletní popis ovládání je v [README.md](README.md).
   z Microsoft Store — vyřeší ho instalace Pythonu z python.org s „Add to PATH".)
 - **Ukončení aplikace** — pravý klik na ikonu → *Konec*, nebo v příkazové
   řádce `py -m timetrack quit`.
-- **Aktualizace** — rozbal novou verzi a spusť `Nainstalovat TimeTrack.cmd`
-  znovu. Průvodce sám ukončí běžící aplikaci a po instalaci ji zase spustí;
-  na už vyplněné věci (e-mail, tokeny, autostart) se znovu neptá. Tvoje data
-  i nastavení zůstanou (jsou mimo složku aplikace).
+- **Aktualizace** — nejjednodušší je dvojklik na **`Aktualizovat
+  TimeTrack.cmd`** (je ve složce aplikace i v ZIPu). Zkontroluje GitHub, a
+  pokud vyšla novější verze, stáhne ji, ověří kontrolní součet (SHA-256) a
+  tiše ji nainstaluje — běžící aplikaci sám ukončí a po instalaci zase
+  spustí. Vyžaduje Python (stejně jako instalace ze ZIPu). Ruční varianta:
+  rozbal novou verzi a spusť `Nainstalovat TimeTrack.cmd` znovu. Na už
+  vyplněné věci (e-mail, tokeny, autostart) se znovu neptá; tvoje data i
+  nastavení zůstanou (jsou mimo složku aplikace).
 - **Kde jsou má data** — v `Dokumenty\TimeTrack` (jeden soubor na den).
 - **Chyby odesílání do Jiry** se logují do
   `%USERPROFILE%\.timetrack\api_errors.log`.
